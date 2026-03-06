@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Turn API documentation websites (Swagger/Redoc/Docusaurus) into OpenAPI & Postman-ready formats.
 
 ## Getting Started
 
-First, run the development server:
+### Web app
+
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### CLI
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Scrape API docs from the command line:
 
-## Learn More
+```bash
+pnpm apidocs <url> [options]
+```
 
-To learn more about Next.js, take a look at the following resources:
+Sau khi publish lên npm, dùng trực tiếp qua `npx`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npx apidocs <url> [options]
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Arguments**
 
-## Deploy on Vercel
+- `url` – API docs URL (required)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Options** (giống bản web)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Option | Mô tả |
+|--------|-------|
+| `--docs-type`, `-t` | Loại docs: `auto` \| `swagger` \| `redoc` \| `redocly` \| `docusaurus` (default: `auto`) |
+| `--format`, `-f` | Output: `openapi` \| `postman` (default: `openapi`) |
+| `--output`, `-o` | File output (default: stdout) |
+| `--as` | Với openapi: `json` \| `yaml` (default: `json`) |
+
+**Ví dụ**
+
+```bash
+# Xuất OpenAPI JSON ra stdout
+pnpm apidocs https://petstore.swagger.io
+
+# Xuất OpenAPI YAML ra file
+pnpm apidocs https://example.com/api --format openapi --as yaml -o openapi.yaml
+
+# Xuất Postman collection
+pnpm apidocs https://example.com/api --format postman -o postman.json
+
+# Chỉ định loại docs (Swagger/Redoc/Docusaurus)
+pnpm apidocs https://example.com/docs -t swagger -o spec.json
+```
+
+Sau khi cài global (`pnpm add -g .`), có thể chạy trực tiếp: `apidocs <url>`
+
+## Publish npm (GitHub Actions)
+
+- Tạo secret `NPM_TOKEN` trong GitHub repo (token có quyền publish).
+- Tăng version trong `package.json` (hoặc cứ tag theo version bạn muốn publish).
+- Tạo tag dạng `vX.Y.Z` rồi push tag. Workflow `Publish to npm` sẽ chạy và publish.

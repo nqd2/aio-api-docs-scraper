@@ -1,12 +1,26 @@
 {
-  "name": "api-docs-scraper",
+  "name": "apidocs",
   "version": "0.1.0",
-  "private": true,
+  "description": "Turn API documentation websites (Swagger/Redoc/Docusaurus) into OpenAPI & Postman formats.",
+  "license": "UNLICENSED",
+  "bin": {
+    "apidocs": "dist/bin/apidocs.js"
+  },
+  "files": [
+    "dist/**",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "apidocs": "tsx bin/apidocs.ts",
+    "build:cli": "tsc -p tsconfig.cli.json",
+    "prepublishOnly": "pnpm run build:cli"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
@@ -21,6 +35,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "tsx": "^4.19.0",
     "@types/node": "^20",
     "@types/postman-collection": "^3.5.11",
     "@types/react": "^19",
