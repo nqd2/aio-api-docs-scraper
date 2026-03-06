@@ -25,6 +25,32 @@ type JobDetail = JobSummary & {
   hasResult?: boolean;
 };
 
+const LOCAL_JOBS_KEY = "aio-api-scraper:jobs";
+
+function readJobsFromStorage(): JobSummary[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_JOBS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed as JobSummary[];
+  } catch {
+    return [];
+  }
+}
+
+function writeJobsToStorage(jobs: JobSummary[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const limited = [...jobs];
+    if (limited.length > 50) limited.length = 50;
+    window.localStorage.setItem(LOCAL_JOBS_KEY, JSON.stringify(limited));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 const UrlSchema = z.string().min(1);
 
 function normalizeUrl(input: string) {
@@ -45,11 +71,11 @@ function formatTime(iso: string) {
 function statusBadge(status: JobSummary["status"]) {
   switch (status) {
     case "completed":
-      return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30";
+      return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
     case "failed":
-      return "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30";
+      return "bg-rose-500/20 text-rose-300 border-rose-500/30";
     case "running":
-      return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30";
+      return "bg-blue-500/20 text-blue-300 border-blue-500/30";
     default:
       return "bg-muted text-muted-foreground border-border";
   }
@@ -61,7 +87,12 @@ export function Dashboard() {
   const [urlError, setUrlError] = useState<string | null>(null);
 
   const [currentJob, setCurrentJob] = useState<JobDetail | null>(null);
-  const [jobs, setJobs] = useState<JobSummary[]>([]);
+  const [jobs, setJobs] = useState<JobSummary[]>(() => {
+    const fromStorage = readJobsFromStorage();
+    if (fromStorage.length === 0) return [];
+    const sorted = [...fromStorage].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return sorted;
+  });
   const [previewFormat, setPreviewFormat] = useState<"openapi" | "postman">("openapi");
   const [previewText, setPreviewText] = useState<string>("");
   const [previewMeta, setPreviewMeta] = useState<{ truncated: boolean } | null>(null);
@@ -86,12 +117,43 @@ export function Dashboard() {
     return null;
   }, []);
 
-  const refreshJobs = useCallback(async () => {
-    const res = await fetch("/api/jobs?limit=20", { cache: "no-store" });
-    if (!res.ok) return;
-    const data = (await res.json()) as { jobs: JobSummary[] };
-    setJobs(data.jobs);
+  const refreshJobs = useCallback(() => {
+    const fromStorage = readJobsFromStorage();
+    if (fromStorage.length === 0) {
+      setJobs([]);
+      return;
+    }
+    const sorted = [...fromStorage].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    setJobs(sorted);
   }, []);
+
+  const upsertFromDetail = useCallback((job: JobDetail) => {
+    setJobs((prev) => {
+      const summary: JobSummary = {
+        id: job.id,
+        url: job.url,
+        status: job.status,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        progress: job.progress,
+        stats: job.stats,
+        error: job.error,
+      };
+      const next = prev.filter((j) => j.id !== summary.id);
+      next.push(summary);
+      next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      writeJobsToStorage(next);
+      return next;
+    });
+  }, []);
+
+  const setCurrentJobWithHistory = useCallback(
+    (job: JobDetail) => {
+      setCurrentJob(job);
+      upsertFromDetail(job);
+    },
+    [upsertFromDetail],
+  );
 
   const stopRealtime = useCallback(() => {
     sseRef.current?.close();
@@ -136,13 +198,20 @@ export function Dashboard() {
       sseRef.current = es;
 
       const onAnyUpdate = (patch: Partial<JobDetail>) => {
-        setCurrentJob((prev) => ({ ...(prev ?? ({ id: jobId } as JobDetail)), ...patch } as JobDetail));
+        setCurrentJob((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          const next = { ...prev, ...patch } as JobDetail;
+          upsertFromDetail(next);
+          return next;
+        });
       };
 
       es.addEventListener("snapshot", (evt) => {
         try {
           const data = JSON.parse((evt as MessageEvent).data) as JobDetail;
-          setCurrentJob(data);
+          setCurrentJobWithHistory(data);
         } catch {
           // ignore
         }
@@ -158,7 +227,6 @@ export function Dashboard() {
       });
 
       es.addEventListener("completed", () => {
-        void refreshJobs();
         void loadPreview(jobId, previewFormat);
       });
 
@@ -168,8 +236,6 @@ export function Dashboard() {
           onAnyUpdate({ status: "failed", error: data.error });
         } catch {
           onAnyUpdate({ status: "failed", error: { message: "Job failed" } });
-        } finally {
-          void refreshJobs();
         }
       });
 
@@ -180,16 +246,15 @@ export function Dashboard() {
         // Fallback polling
         pollRef.current = window.setInterval(async () => {
           const job = await fetchJob(jobId);
-          if (job) setCurrentJob(job);
+            if (job) setCurrentJobWithHistory(job);
           if (job?.status === "completed" || job?.status === "failed") {
             stopRealtime();
-            void refreshJobs();
             if (job?.status === "completed") void loadPreview(jobId, previewFormat);
           }
         }, 1500);
       };
     },
-    [fetchJob, loadPreview, previewFormat, refreshJobs, stopRealtime],
+    [fetchJob, loadPreview, previewFormat, setCurrentJobWithHistory, stopRealtime, upsertFromDetail],
   );
 
   const onSubmit = useCallback(async () => {
@@ -227,11 +292,10 @@ export function Dashboard() {
 
       const jobId = data.jobId;
       const job = await fetchJob(jobId);
-      if (job) setCurrentJob(job);
+      if (job) setCurrentJobWithHistory(job);
       connectSse(jobId);
-      void refreshJobs();
     });
-  }, [connectSse, docsType, fetchJob, refreshJobs, stopRealtime, url, validateUrl]);
+  }, [connectSse, docsType, fetchJob, setCurrentJobWithHistory, stopRealtime, url, validateUrl]);
 
   const downloadHref = useMemo(() => {
     if (!currentJob?.id || currentJob.status !== "completed") return null;
@@ -244,9 +308,8 @@ export function Dashboard() {
   }, [currentJob]);
 
   useEffect(() => {
-    void refreshJobs();
     return () => stopRealtime();
-  }, [refreshJobs, stopRealtime]);
+  }, [stopRealtime]);
 
   const ensureTableData = useCallback(
     async (jobId: string, format: "openapi" | "postman") => {
@@ -265,7 +328,7 @@ export function Dashboard() {
   );
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10">
       <DashboardHeader onRefresh={refreshJobs} />
       <DashboardForm
         url={url}
@@ -279,11 +342,12 @@ export function Dashboard() {
         onSubmit={onSubmit}
       />
 
-      <section className="grid gap-6 lg:grid-cols-12">
+      <section className="grid gap-8 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-4">
           <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Step 2 · Scrape</p>
                 <p className="text-sm font-semibold text-foreground">Progress</p>
                 <p className="text-xs text-muted-foreground">{progress.message ?? progress.step}</p>
               </div>
@@ -303,7 +367,7 @@ export function Dashboard() {
             <div className="mt-4">
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-accent transition-[width] duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-accent to-emerald-400 transition-[width] duration-300"
                   style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }}
                 />
               </div>
@@ -335,7 +399,10 @@ export function Dashboard() {
 
           <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">Download result</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Step 4 · Download</p>
+                <p className="text-sm font-semibold text-foreground">Download result</p>
+              </div>
               <p className="text-xs text-muted-foreground">{canDownload ? "Ready" : "Waiting for job to finish"}</p>
             </div>
 
@@ -389,6 +456,7 @@ export function Dashboard() {
           <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Step 3 · Preview</p>
                 <p className="text-sm font-semibold text-foreground">JSON preview</p>
                 <p className="text-xs text-muted-foreground">
                   {currentJob?.status === "completed"
@@ -501,7 +569,10 @@ export function Dashboard() {
 
           <div className="rounded-2xl border border-border bg-card/60 p-4 shadow-sm backdrop-blur sm:p-5">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-foreground">Job history</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Activity</p>
+                <p className="text-sm font-semibold text-foreground">Job history</p>
+              </div>
               <p className="text-xs text-muted-foreground">{jobs.length} items</p>
             </div>
 
