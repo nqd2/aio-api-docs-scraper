@@ -16,6 +16,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "AIO API Docs Scraper",
   description: "Turn API documentation (Swagger, Redoc, Docusaurus) into OpenAPI specs and Postman collections.",
+  openGraph: {
+    title: "AIO API Docs Scraper",
+    description: "Turn API documentation (Swagger, Redoc, Docusaurus) into OpenAPI specs.",
+    type: "website",
+    siteName: "AIO API Docs Scraper",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AIO API Docs Scraper",
+    description: "Turn API documentation into OpenAPI specs.",
+  },
 };
 
 export default function RootLayout({

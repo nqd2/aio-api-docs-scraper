@@ -1,5 +1,6 @@
 import { Dashboard } from "./_components/dashboard";
 import { PlexusBackground } from "./_components/plexus-background";
+import { Analytics } from "@vercel/analytics/next"
 
 export default function Home() {
   return (
@@ -11,6 +12,7 @@ export default function Home() {
       <PlexusBackground points={70} connectDistance={160} opacity={0.55} />
 
       <Dashboard />
+      <Analytics />
     </div>
   );
 }
