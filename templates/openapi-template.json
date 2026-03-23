@@ -1,0 +1,10 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API",
+    "version": "1.0.0",
+    "description": ""
+  },
+  "servers": [{ "url": "https://api.example.com", "description": "Base URL — replace with real host" }],
+  "paths": {}
+}

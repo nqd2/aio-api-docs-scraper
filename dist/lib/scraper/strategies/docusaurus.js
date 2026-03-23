@@ -35,20 +35,10 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocusaurusStrategy = void 0;
 const cheerio = __importStar(require("cheerio"));
+const doc_fetch_1 = require("../../http/doc-fetch");
 const redoc_1 = require("./redoc");
 const MAX_PAGES = 220;
 const MAX_QUEUE = 600;
-async function fetchHtml(url) {
-    const res = await fetch(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html',
-        },
-        redirect: 'follow',
-    });
-    const html = await res.text();
-    return { url: res.url || url, status: res.status, html };
-}
 function normalizeSameOriginLink(baseUrl, href) {
     try {
         const u = new URL(href, baseUrl);
@@ -177,12 +167,8 @@ function extractEndpointsFromHtml(html) {
     return { endpoints, serverOrigins: Array.from(serverOrigins) };
 }
 class DocusaurusStrategy {
-    detect(pageContent, _url) {
-        const htmlLower = pageContent.toLowerCase();
-        return htmlLower.includes('docusaurus') || htmlLower.includes('__docusaurus') || htmlLower.includes('data-generator="docusaurus"');
-    }
     async scrape(url) {
-        const start = await fetchHtml(url);
+        const start = await (0, doc_fetch_1.fetchDocHtml)(url);
         if (start.status >= 400) {
             throw new Error(`Unable to load Docusaurus page: HTTP ${start.status}`);
         }
@@ -217,7 +203,7 @@ class DocusaurusStrategy {
             const pageUrl = queue.shift();
             processed += 1;
             try {
-                const page = pageUrl === startUrl.toString() ? start : await fetchHtml(pageUrl);
+                const page = pageUrl === startUrl.toString() ? start : await (0, doc_fetch_1.fetchDocHtml)(pageUrl);
                 if (page.status >= 400)
                     continue;
                 const extracted = extractEndpointsFromHtml(page.html);

@@ -1,48 +1,40 @@
 {
-  "name": "apidocs",
+  "name": "aioapi",
   "version": "0.1.0",
   "description": "Turn API documentation websites (Swagger/Redoc/Docusaurus) into OpenAPI & Postman formats.",
   "license": "UNLICENSED",
   "bin": {
-    "apidocs": "dist/bin/apidocs.js"
+    "aioapi": "dist/bin/aioapi.js"
   },
   "files": [
     "dist/**",
+    "prompts/**",
+    "templates/**",
     "README.md"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "apidocs": "tsx bin/apidocs.ts",
-    "build:cli": "tsc -p tsconfig.cli.json",
-    "prepublishOnly": "pnpm run build:cli"
+    "build": "tsc",
+    "lint": "eslint src",
+    "aioapi": "tsx src/bin/aioapi.ts",
+    "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@vercel/analytics": "^1.6.1",
     "axios": "^1.13.6",
     "cheerio": "^1.2.0",
-    "next": "16.1.6",
     "playwright": "^1.58.2",
     "postman-collection": "^5.3.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@eslint/js": "^9.39.3",
     "tsx": "^4.19.0",
     "@types/node": "^20",
     "@types/postman-collection": "^3.5.11",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.56.1"
   }
 }

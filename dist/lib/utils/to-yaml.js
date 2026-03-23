@@ -10,7 +10,10 @@ function toYaml(value, indent = "") {
         return String(value);
     }
     if (typeof value === "string") {
-        if (value === "" || /[:\-\?\[\]\{\},&\*#\!\|\>\<\n\r\t]/.test(value)) {
+        if (value === "" ||
+            /[{}:?&,*#!|><\n\r\t-]/.test(value) ||
+            value.includes("[") ||
+            value.includes("]")) {
             return JSON.stringify(value);
         }
         return value;
@@ -35,7 +38,7 @@ function toYaml(value, indent = "") {
             return "{}";
         return entries
             .map(([key, v]) => {
-            const safeKey = /^[a-zA-Z0-9_\-]+$/.test(key) ? key : JSON.stringify(key);
+            const safeKey = /^[a-zA-Z0-9_-]+$/.test(key) ? key : JSON.stringify(key);
             const rendered = toYaml(v, nextIndent);
             if (rendered.includes("\n")) {
                 return `${indent}${safeKey}:\n${nextIndent}${rendered.replace(/\n/g, `\n${nextIndent}`)}`;
