@@ -84,6 +84,6 @@ aioapi <url>
 
 - Create `NPM_TOKEN` in the GitHub repo (token must have publish rights).
 - Bump the version in `package.json` (or tag the version you want).
-- Push a tag named `vX.Y.Z`; the workflow `Publish to npm` publishes the package.
+- Publish a GitHub Release with tag `vX.Y.Z`; the workflow `Publish npm package` publishes the package (and validates the tag matches `package.json` version).
 
 **Note:** `aioapi` must be unclaimed on npm public. If the name is taken, switch to a scoped package and use `npx @scope/aioapi`.
